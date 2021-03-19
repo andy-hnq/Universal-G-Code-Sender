@@ -30,6 +30,8 @@ import com.willwinder.universalgcodesender.types.GcodeCommand;
 
 public class MarlinController extends AbstractController {
 
+	public static final boolean REALTIME_ENABLED = false;
+
 	private static final Logger logger = Logger.getLogger(MarlinController.class.getName());
 
 	private final MarlinFirmwareSettings firmwareSettings;
@@ -230,6 +232,21 @@ public class MarlinController extends AbstractController {
 				dispatchStatusString(controllerStatus);
 
 				this.checkStreamFinished();
+			} else if (MarlinUtils.isMarlinRealtimeStatusString(response)) {
+				// Only 1 poll is sent at a time so don't decrement, reset to zero.
+				this.outstandingPolls = 0;
+
+				// Realtime Status string doesnt go to verbose console
+				verbose = false;
+
+				// this.handleStatusString(response);
+
+				controllerStatus = MarlinUtils.getStatusFromRealtimeStatusString(
+						controllerStatus, response, capabilities, getFirmwareSettings().getReportingUnits());
+
+				dispatchStatusString(controllerStatus);
+
+				// this.checkStreamFinished();
 			} else if (response.contains("Free Memory:")) {
 				updateControllerState("Idle", ControllerState.IDLE);
 				// this.isReady = true;
@@ -338,12 +355,16 @@ public class MarlinController extends AbstractController {
 						try {
 							if (outstandingPolls == 0) {
 								outstandingPolls++;
-								sendCommandImmediately(createCommand("M114"));
-								// for debugging M114 - stop the timer so only one is sent
-								// positionPollTimer.stop();
+								if (REALTIME_ENABLED) {
+									requestStatusReport();
+								} else {
+									sendCommandImmediately(createCommand("M114"));
+									// for debugging M114 - stop the timer so only one is sent
+									// positionPollTimer.stop();
 
-								// adjust the sent counter
-								nonScriptedCommandsSent++;
+									// adjust the sent counter
+									nonScriptedCommandsSent++;
+								}
 							} else {
 								// If a poll is somehow lost after 20 intervals,
 								// reset for sending another.
@@ -403,8 +424,11 @@ public class MarlinController extends AbstractController {
 
 	@Override
 	public void requestStatusReport() throws Exception {
-		// TODO Auto-generated method stub
+		if (!this.isCommOpen()) {
+			throw new RuntimeException("Not connected to the controller");
+		}
 
+		comm.sendByteImmediately(GrblUtils.GRBL_STATUS_COMMAND);
 	}
 
 	@Override
@@ -510,7 +534,7 @@ public class MarlinController extends AbstractController {
 	@Override
 	public Boolean isPaused() {
 		Boolean b = super.isPaused();
-		logger.fine("isPaused =>" + b.toString());
+		logger.info("isPaused =>" + b.toString());
 		return b;
 	}
 	

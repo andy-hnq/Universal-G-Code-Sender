@@ -20,6 +20,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.willwinder.universalgcodesender.i18n.Localization;
+import com.willwinder.universalgcodesender.listeners.ControllerStatus;
 import com.willwinder.universalgcodesender.mockobjects.MockConnection;
 import com.willwinder.universalgcodesender.mockobjects.MockMarlinCommunicator;
 import com.willwinder.universalgcodesender.types.GcodeCommand;
@@ -322,5 +323,37 @@ public class MarlinControllerTest {
 		assertTrue(instance.isPaused());
 		instance.rawResponseHandler("ok");
 		assertFalse(instance.isPaused());
+	}
+
+	/**
+	 * Test of status string parsing.
+	 */
+	@Test
+	public void testStatusStringParsing() throws Exception {
+		System.out.println("Status String Parsing");
+		MarlinController instance = new MarlinController(mgc);
+		instance.openCommPort(getSettings().getConnectionDriver(), "blah", 1234);
+		instance.rawResponseHandler("X:1.23 Y:4.56 Z:7.89 E:0.00 Count X:0 Y:0 Z:0");
+
+		ControllerStatus controllerStatus = instance.getControllerStatus();
+		assertEquals(1.23, controllerStatus.getMachineCoord().getX(), 0.001);
+		assertEquals(4.56, controllerStatus.getMachineCoord().getY(), 0.001);
+		assertEquals(7.89, controllerStatus.getMachineCoord().getZ(), 0.001);
+	}
+
+	/**
+	 * Test of rel time status string parsing.
+	 */
+	@Test
+	public void testRealtimeStatusStringParsing() throws Exception {
+		System.out.println("Realtime Status String Parsing");
+		MarlinController instance = new MarlinController(mgc);
+		instance.openCommPort(getSettings().getConnectionDriver(), "blah", 1234);
+		instance.rawResponseHandler("<<X:1.11 Y:2.22 Z:3.33 E:0.00 F:25.00 S_XYZ:3>>");
+
+		ControllerStatus controllerStatus = instance.getControllerStatus();
+		assertEquals(1.11, controllerStatus.getMachineCoord().getX(), 0.001);
+		assertEquals(2.22, controllerStatus.getMachineCoord().getY(), 0.001);
+		assertEquals(3.33, controllerStatus.getMachineCoord().getZ(), 0.001);
 	}
 }

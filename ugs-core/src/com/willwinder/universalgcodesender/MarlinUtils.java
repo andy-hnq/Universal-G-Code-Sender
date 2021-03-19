@@ -11,6 +11,7 @@ import com.willwinder.universalgcodesender.model.Position;
 import com.willwinder.universalgcodesender.model.UnitUtils.Units;
 
 public class MarlinUtils {
+
 	public static boolean isOkErrorAlarmResponse(String response) {
 		return isOkResponse(response); // || isErrorResponse(response) || isAlarmResponse(response);
 	}
@@ -24,6 +25,14 @@ public class MarlinUtils {
 	 */
 	private static final String STATUS_REGEX = "^X\\:";
 	private static final Pattern STATUS_PATTERN = Pattern.compile(STATUS_REGEX);
+	private static final String STATUS_SPLITTER_REGEX = "^X\\:([^ ]+) Y\\:([^ ]+) Z\\:([^ ]+) E";
+	private static final Pattern STATUS_SPLITTER_PATTERN = Pattern.compile(STATUS_SPLITTER_REGEX);
+
+	private static final String RT_STATUS_REGEX = "^\\<\\<X\\:";
+	private static final Pattern RT_STATUS_PATTERN = Pattern.compile(RT_STATUS_REGEX);
+	private static final String RT_STATUS_SPLITTER_REGEX = "^\\<\\<X\\:([^ ]+) Y\\:([^ ]+) Z\\:([^ ]+) E";
+	private static final Pattern RT_STATUS_SPLITTER_PATTERN = Pattern.compile(RT_STATUS_SPLITTER_REGEX);
+
 	private static final String GCODE_SET_COORDINATE = "G92";
 	public static final String GCODE_ABS_COORDS = "G90";
 	public static final String GCODE_REL_COORDS = "G91";
@@ -34,17 +43,30 @@ public class MarlinUtils {
 		return STATUS_PATTERN.matcher(response).find();
 	}
 
+	static protected Boolean isMarlinRealtimeStatusString(final String response) {
+		return RT_STATUS_PATTERN.matcher(response).find();
+	}
+
 	/*
 	 * M114 response...
 	 *
 	 * X:0.00 Y:0.00 Z:0.00 E:0.00 Count X:0 Y:0 Z:0
 	 */
-
 	static protected ControllerStatus getStatusFromStatusString(
 			ControllerStatus lastStatus, final String status,
 			final Capabilities version, Units reportingUnits) {
-		final Pattern splitterPattern = Pattern.compile("^X\\:([^ ]+) Y\\:([^ ]+) Z\\:([^ ]+) E");
-		Matcher matcher = splitterPattern.matcher(status);
+		Matcher matcher = STATUS_SPLITTER_PATTERN.matcher(status);
+		return doGetStatusFromStatusString(lastStatus, status, matcher);
+	}
+
+	static protected ControllerStatus getStatusFromRealtimeStatusString(
+			ControllerStatus lastStatus, final String status,
+			final Capabilities version, Units reportingUnits) {
+		Matcher matcher = RT_STATUS_SPLITTER_PATTERN.matcher(status);
+		return doGetStatusFromStatusString(lastStatus, status, matcher);
+	}
+
+	private static ControllerStatus doGetStatusFromStatusString(ControllerStatus lastStatus, final String status, Matcher matcher) {
 		if (matcher.find()) {
 			Double xpos = getCoord(matcher, 1);
 			Double ypos = getCoord(matcher, 2);
