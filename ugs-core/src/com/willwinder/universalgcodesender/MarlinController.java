@@ -30,21 +30,19 @@ import com.willwinder.universalgcodesender.types.GcodeCommand;
 
 public class MarlinController extends AbstractController {
 
-	public static final boolean REALTIME_ENABLED = false;
-
 	private static final Logger logger = Logger.getLogger(MarlinController.class.getName());
 
 	private final MarlinFirmwareSettings firmwareSettings;
-	private Capabilities capabilities = new Capabilities();
+	protected Capabilities capabilities = new Capabilities();
 
 	// Polling state
 	private int outstandingPolls = 0;
 	private Timer positionPollTimer = null;
-	private ControllerStatus controllerStatus = new ControllerStatus(ControllerState.DISCONNECTED, new Position(0, 0, 0, Units.MM),
+	protected ControllerStatus controllerStatus = new ControllerStatus(ControllerState.DISCONNECTED, new Position(0, 0, 0, Units.MM),
 			new Position(0, 0, 0, Units.MM));
 
 	private MarlinCommunicator marlinComm;
-	private boolean isResuming = false;
+	protected boolean isResuming = false;
 	private String marlinVersion = "UNKNOWN";
 	private boolean marlinVersionSeen = false;
 
@@ -189,9 +187,15 @@ public class MarlinController extends AbstractController {
 			}
 			
 			if (MarlinUtils.isOkResponse(response)) {
+				logger.info("isOKResponse");
 				if (this.getActiveCommand().isPresent()) {
-					this.commandComplete(processed);
-					logger.info("active count after rx: " + marlinComm.activeCommandListSize());
+					try {
+						this.commandComplete(processed);
+						logger.info("active count after OK: " + marlinComm.activeCommandListSize());
+					} catch (UnexpectedCommand e) {
+						logger.severe("failure in commandComplete: " + e.toString());
+						throw e;
+					}
 				} else {
 					logger.info("received OK with no active commands... possibly pause or resume msg?");
 				}
@@ -199,6 +203,7 @@ public class MarlinController extends AbstractController {
 				if (this.getActiveCommand().isPresent() || (isStreaming() && rowsRemaining() > 0)) {
 					updateControllerState("Run", ControllerState.RUN);
 				} else {
+					logger.info("going idle after OK");
 					updateControllerState("Idle", ControllerState.IDLE);
 				}
 				marlinComm.setMarlinBusy(false);
@@ -355,16 +360,7 @@ public class MarlinController extends AbstractController {
 						try {
 							if (outstandingPolls == 0) {
 								outstandingPolls++;
-								if (REALTIME_ENABLED) {
-									requestStatusReport();
-								} else {
-									sendCommandImmediately(createCommand("M114"));
-									// for debugging M114 - stop the timer so only one is sent
-									// positionPollTimer.stop();
-
-									// adjust the sent counter
-									nonScriptedCommandsSent++;
-								}
+								requestStatusReport();
 							} else {
 								// If a poll is somehow lost after 20 intervals,
 								// reset for sending another.
@@ -428,7 +424,12 @@ public class MarlinController extends AbstractController {
 			throw new RuntimeException("Not connected to the controller");
 		}
 
-		comm.sendByteImmediately(GrblUtils.GRBL_STATUS_COMMAND);
+		sendCommandImmediately(createCommand("M114"));
+		// for debugging M114 - stop the timer so only one is sent
+		// positionPollTimer.stop();
+
+		// adjust the sent counter
+		nonScriptedCommandsSent++;
 	}
 
 	@Override

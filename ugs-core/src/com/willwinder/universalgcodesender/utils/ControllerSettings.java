@@ -70,7 +70,8 @@ public class ControllerSettings {
         XLCD("XLCD"),
         LOOPBACK("Loopback"),
         LOOPBACK_SLOW("Loopback_Slow"),
-        MARLIN("Marlin");
+		MARLIN("Marlin"),
+        MARLINRT("Marlin Realtime");
 
         final String name;
         CONTROLLER(String name) {
@@ -125,6 +126,8 @@ public class ControllerSettings {
                 return new GrblController(new LoopBackCommunicator(100));
             case MARLIN:
                 return new MarlinController();
+			case MARLINRT:
+				return new MarlinRealtimeController();
             default:
                 throw new AssertionError(controller.name());
         }
